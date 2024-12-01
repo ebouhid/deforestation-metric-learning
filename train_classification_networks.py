@@ -17,8 +17,9 @@ def run_experiment(data_dir, batch_size=32, num_epochs=10, output_csv='results.c
 
     for model_name in architectures:
         model = ClassificationModel(model_name=model_name, log_dir=f"logs/{model_name}")
-        train_ds = SegmentClassificationDataset(root_dir=data_dir, regions=['x01', 'x02', 'x06', 'x07', 'x09', 'x10'], transform=True)
-        val_ds = SegmentClassificationDataset(root_dir=data_dir, regions=['x03', 'x04', 'x08'], transform=False)
+        train_ds = SegmentClassificationDataset(root_dir=data_dir, regions=['x02', 'x06', 'x07', 'x09', 'x10'], transform=True)
+        val_ds = SegmentClassificationDataset(root_dir=data_dir, regions=['x03', 'x08'], transform=False)
+        # Regions x01 and x04 are in the test set
 
         train_dataloader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=23)
         val_dataloader = DataLoader(val_ds, batch_size=batch_size, num_workers=23)
@@ -52,6 +53,27 @@ def run_experiment(data_dir, batch_size=32, num_epochs=10, output_csv='results.c
                 'precision': val_precision,
                 'balanced_acc': val_balanced_acc
             })
+
+        # Evaluate best model on test set
+        model = ClassificationModel.load_from_checkpoint(checkpoint_callback.best_model_path)
+        test_ds = SegmentClassificationDataset(root_dir=data_dir, regions=['x01', 'x04'], transform=False)
+        test_dataloader = DataLoader(test_ds, batch_size=batch_size, num_workers=23)
+        trainer.test(model, test_dataloader)
+
+        test_f1 = model.f1.compute()
+        test_recall = model.recall.compute()
+        test_precision = model.precision.compute()
+        test_balanced_acc = model.balanced_acc.compute()
+
+        results.append({
+            'model': model_name,
+            'loop': 'test',
+            'epoch': 0,
+            'f1': test_f1,
+            'recall': test_recall,
+            'precision': test_precision,
+            'balanced_acc': test_balanced_acc
+        })
     
     # Group by train and val epoch and take mean value of each metric
     results = pd.DataFrame.from_records(results)
