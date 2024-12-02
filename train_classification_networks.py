@@ -81,8 +81,8 @@ def run_experiment(data_dir, batch_size=32, num_epochs=10, output_csv='results.c
     results = pd.DataFrame.from_records(results)
     results = results.groupby(['model', 'loop', 'epoch']).mean().reset_index()
 
-    results.to_csv(output_csv, index=False)
-    print(f"Results saved to {output_csv}")
+    results.to_csv(os.path.join(trainer.logger.log_dir, output_csv), index=False)
+    print(f"Results saved to {os.path.join(trainer.logger.log_dir, output_csv)}")
 
     # Plot and save metrics, log to lightning
     for metric_name in model.train_metrics.keys():
