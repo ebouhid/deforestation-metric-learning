@@ -5,6 +5,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from classification_models import ClassificationModel
 from dataset import SegmentClassificationDataset
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+import os
 
 
 # Set random seed for reproducibility
@@ -82,5 +84,24 @@ def run_experiment(data_dir, batch_size=32, num_epochs=10, output_csv='results.c
     results.to_csv(output_csv, index=False)
     print(f"Results saved to {output_csv}")
 
+    # Plot and save metrics, log to lightning
+    for metric_name in model.train_metrics.keys():
+        plt.figure()
+        for model_name in architectures:
+            model_results = results[results['model'] == model_name]
+            plt.plot(model_results[model_results['loop'] == 'train']['epoch'], model_results[model_results['loop'] == 'train'][metric_name], label=f'{model_name} Train')
+            plt.plot(model_results[model_results['loop'] == 'val']['epoch'], model_results[model_results['loop'] == 'val'][metric_name], label=f'{model_name} Validation')
+        plt.title(f'{metric_name.capitalize()} over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel(metric_name.capitalize())
+        plt.legend()
+        
+        # Create a network_training_results folder in the lightning experiment
+        os.makedirs(f"{trainer.logger.log_dir}/network_training_results", exist_ok=True)
+        plt_path = os.path.join(trainer.logger.log_dir, "network_training_results", f'{metric_name}.png')
+        plt.savefig(plt_path)
+        plt.close()
+
+
 data_dir = "./segment_embeddings_classification_dataset_norsz/"
-run_experiment(data_dir=data_dir, batch_size=64, num_epochs=200, output_csv='model_metrics_norsz.csv', checkpoints_dir='checkpoints_norsz')
+run_experiment(data_dir=data_dir, batch_size=64, num_epochs=100, output_csv='model_metrics2.csv', checkpoints_dir='network_checkpoints2')
