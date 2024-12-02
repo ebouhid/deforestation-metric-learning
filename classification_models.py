@@ -102,6 +102,10 @@ class ClassificationModel(LightningModule):
         
         return {'val_loss': val_loss, 'val_f1': f1, 'val_recall': recall, 'val_precision': precision, 'val_balanced_acc': balanced_acc}
 
+    def test_step(self, batch, batch_idx):
+        # For now, same as validation step
+        return self.validation_step(batch, batch_idx)
+
     # def on_validation_epoch_end(self):
     #     # Plot and save metrics
     #     for metric_name in self.train_metrics.keys():
