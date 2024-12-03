@@ -89,8 +89,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    TRAIN_REGIONS = ['x01', 'x02', 'x06', 'x07', 'x09', 'x10']
-    VAL_REGIONS = ['x03', 'x04', 'x08']
+    TRAIN_REGIONS = ['x02', 'x06', 'x07', 'x09', 'x10']
+    VAL_REGIONS = ['x03', 'x08']
+    TEST_REGIONS = ['x01', 'x04']
 
     if args.model_name != "haralick":
         if args.fine_tune_ckpt is None:
@@ -103,9 +104,11 @@ if __name__ == "__main__":
 
     train_ds = SegmentClassificationDataset(root_dir=args.input_dir, regions=TRAIN_REGIONS, transform=True)
     val_ds = SegmentClassificationDataset(root_dir=args.input_dir, regions=VAL_REGIONS, transform=False)
+    test_ds = SegmentClassificationDataset(root_dir=args.input_dir, regions=TEST_REGIONS, transform=False)
 
     train_dataloader = DataLoader(train_ds, batch_size=32, shuffle=False, num_workers=23)
     val_dataloader = DataLoader(val_ds, batch_size=32, num_workers=23)
+    test_dataloader = DataLoader(test_ds, batch_size=32, num_workers=23)
 
     metadata = dict()
     metadata["model_name"] = args.model_name
@@ -120,8 +123,10 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(args.output_dir, "train", "recent_def"), exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "val", "forest"), exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "val", "recent_def"), exist_ok=True)
+    os.makedirs(os.path.join(args.output_dir, "test", "forest"), exist_ok=True)
+    os.makedirs(os.path.join(args.output_dir, "test", "recent_def"), exist_ok=True)
 
-    for split, dataloader in [("train", train_dataloader), ("val", val_dataloader)]: 
+    for split, dataloader in [("train", train_dataloader), ("val", val_dataloader), ("test", test_dataloader)]: 
         for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Processing {split}"):
             image = batch["image"]
             gt = batch["label"]
@@ -145,7 +150,9 @@ if __name__ == "__main__":
     metadata["val_forest"] = len([x for x in val_ds.labels if x == 0])
     metadata["val_recent_def"] = len([x for x in val_ds.labels if x == 1])
 
+    metadata["test_size"] = len(test_ds)
+    metadata["test_forest"] = len([x for x in test_ds.labels if x == 0])
+    metadata["test_recent_def"] = len([x for x in test_ds.labels if x == 1])
+
     with open(f"{args.output_dir}/metadata.json", "w") as f:
         json.dump(metadata, f, indent=4)
-
-
