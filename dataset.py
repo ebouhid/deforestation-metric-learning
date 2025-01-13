@@ -2,14 +2,16 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 import torchvision.transforms as T
+import torch
 
 class SegmentClassificationDataset(Dataset):
-    def __init__(self, root_dir, regions, transform=False):
+    def __init__(self, root_dir, regions, transform=False, return_dict=True):
         self.root_dir = root_dir
         self.regions = regions
         self.transform = transform
         self.image_paths = []
         self.labels = []
+        self.return_dict = return_dict
         
         # Populate image paths and labels based on specified regions
         self._load_images()
@@ -37,7 +39,7 @@ class SegmentClassificationDataset(Dataset):
                     self.image_paths.append(file_path)
                     
                     label = filename.split('_')[1].split('.')[0]
-                    label = 0 if label == 'forest' else 1
+                    label = 0 if label == 'forest' else 1 if 'recent_def' in label else -1
                     self.labels.append(label)
 
     def __len__(self):
@@ -56,4 +58,10 @@ class SegmentClassificationDataset(Dataset):
         image = mandatory_transforms(image)
         label = int(label)
 
-        return {'image': image, 'label': label}
+        image = image.float()
+        label = torch.tensor(label, dtype=torch.long)
+
+        if self.return_dict:
+            return {'image': image, 'label': label}
+        
+        return image, label
