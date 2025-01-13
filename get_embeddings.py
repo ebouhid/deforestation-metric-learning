@@ -12,6 +12,23 @@ from pytorch_lightning import LightningModule
 from classification_models import ClassificationModel
 
 
+class TrunkModelDML(torch.nn.Module):
+    def __init__(self, backbone_name="resnet50", pretrained=True):
+        super(TrunkModelDML, self).__init__()
+        self.backbone = timm.create_model(backbone_name, pretrained=pretrained, num_classes=0)
+
+    def forward(self, x):
+        return self.backbone(x)
+
+
+class EmbedderModelDML(torch.nn.Module):
+    def __init__(self, input_size, embedding_size):
+        super(EmbedderModelDML, self).__init__()
+        self.embedding_layer = torch.nn.Linear(input_size, embedding_size)
+
+    def forward(self, x):
+        return self.embedding_layer(x)
+
 
 class EmbeddingModel(torch.nn.Module):
     def __init__(self, model_name: str, pretrained: bool = True):
@@ -81,7 +98,7 @@ class HaralickGenerator(torch.nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, choices=["resnet18", "resnet50", "haralick"])
+    parser.add_argument("--model_name", type=str, choices=["resnet18", "resnet50", "resnet101", "haralick"])
     parser.add_argument("--pretrained", type=bool, default=True)
     parser.add_argument("--fine_tune_ckpt", type=str, default=None)
     parser.add_argument("--input_dir", type=str)
@@ -97,7 +114,13 @@ if __name__ == "__main__":
         if args.fine_tune_ckpt is None:
             model = EmbeddingModel(args.model_name, args.pretrained)
         else:
-            model = FineTunedEmbeddingModel(args.fine_tune_ckpt)
+            embedding_size = timm.create_model(args.model_name, pretrained=True).fc.in_features
+            trunk = TrunkModelDML(backbone_name=args.model_name, pretrained=True)
+            embedder = EmbedderModelDML(input_size=trunk.backbone.num_features, embedding_size=embedding_size)
+            model = torch.nn.Sequential(trunk, embedder)
+            model.load_state_dict(torch.load(args.fine_tune_ckpt, weights_only=True))
+            model.get_output_dims = lambda : [x.shape for x in model(torch.rand(1, 3, 28, 28))]
+            model.eval()
     elif args.model_name == "haralick":
         model = HaralickGenerator()
     
