@@ -6,12 +6,12 @@ import time
 from sklearn.svm import SVC
 from sklearn.preprocessing import normalize
 from sklearn.metrics import f1_score, accuracy_score, balanced_accuracy_score, precision_score, recall_score
-from joblib import dump, Parallel, delayed
-from joblib import parallel_backend
+from joblib import dump, Parallel, delayed, parallel_backend
+from multiprocessing import Manager
 
 seed = 42
 
-def evaluate_svm(C, gamma, kernel, train_embeddings, train_labels, val_embeddings, val_labels, test_embeddigns, test_labels, dataset):
+def evaluate_svm(C, gamma, kernel, train_embeddings, train_labels, val_embeddings, val_labels, test_embeddings, test_labels, dataset):
     start_time = time.time()
     print(f"{datetime.datetime.now()} - Starting evaluation: dataset={dataset}, C={C}, gamma={gamma}, kernel={kernel}", flush=True)
 
@@ -24,7 +24,7 @@ def evaluate_svm(C, gamma, kernel, train_embeddings, train_labels, val_embedding
     val_precision = precision_score(val_labels, val_predictions)
     val_recall = recall_score(val_labels, val_predictions)
 
-    test_predictions = svm.predict(test_embeddigns)
+    test_predictions = svm.predict(test_embeddings)
     test_f1 = f1_score(test_labels, test_predictions)
     test_acc = accuracy_score(test_labels, test_predictions)
     test_bal_acc = balanced_accuracy_score(test_labels, test_predictions)
@@ -59,10 +59,17 @@ def evaluate_svm(C, gamma, kernel, train_embeddings, train_labels, val_embedding
         'is_best': False
     }
 
+def append_results_to_csv(results, csv_path, lock):
+    with lock:  # Ensure thread-safe writing
+        pd.DataFrame([results]).to_csv(csv_path, mode='a', header=not os.path.exists(csv_path), index=False)
 
 if __name__ == "__main__":
-    embeddings_to_evaluate = ['har', 'r18ft', 'r50ft']
-    all_results = []
+    embeddings_to_evaluate = ['r18dml', 'r50dml', 'har', 'r101dml']
+    savepath = "svm_gridsearch_results.csv"
+
+    # Initialize multiprocessing manager
+    manager = Manager()
+    lock = manager.Lock()
 
     for dataset in embeddings_to_evaluate:
         print(f"Evaluating dataset: {dataset}")
@@ -89,36 +96,27 @@ if __name__ == "__main__":
         os.makedirs(f"svm_models/{dataset}", exist_ok=True)
 
         param_grid = {
-            'C': [0.1, 1, 10, 100],
-            'gamma': [0.1, 1, 10, 'auto'],
+            'C': [0.1, 1, 10],
+            'gamma': [0.1, 1, 'auto'],
             'kernel': ['rbf', 'linear', 'poly']
         }
 
-        with parallel_backend('loky', n_jobs=8):
+        # Initialize CSV with headers
+        if not os.path.exists(savepath):
+            pd.DataFrame(columns=[
+                'dataset', 'C', 'gamma', 'kernel', 'val_f1', 'val_acc', 'val_bal_acc', 'val_precision',
+                'val_recall', 'test_f1', 'test_acc', 'test_bal_acc', 'test_precision', 'test_recall',
+                'elapsed_time', 'model_path', 'is_best'
+            ]).to_csv(savepath, index=False)
+
+        with parallel_backend('loky', n_jobs=32):
             jobs = Parallel(verbose=10)(
-                delayed(evaluate_svm)(
-                    C, gamma, kernel, train_embeddings, train_labels, val_embeddings, val_labels, test_embeddings, test_labels, dataset
-                )
+                delayed(lambda c, g, k: append_results_to_csv(
+                    evaluate_svm(c, g, k, train_embeddings, train_labels, val_embeddings, val_labels, test_embeddings, test_labels, dataset),
+                    savepath,
+                    lock
+                ))(C, gamma, kernel)
                 for C in param_grid['C']
                 for gamma in param_grid['gamma']
                 for kernel in param_grid['kernel']
             )
-
-        best_job = max(jobs, key=lambda x: x['val_bal_acc'])
-        best_job['is_best'] = True
-        best_model_path = os.path.join(f"svm_models/{dataset}", f"best_svm_{dataset}.joblib")
-        os.rename(best_job['model_path'], best_model_path)
-        best_job['model_path'] = best_model_path
-
-        print(f"Best params for {dataset}: C={best_job['C']}, gamma={best_job['gamma']}, kernel={best_job['kernel']}")
-        all_results.extend(jobs)
-
-    results_df = pd.DataFrame(all_results)
-    savepath = "svm_gridsearch_results.csv"
-    if os.path.exists(savepath):
-        count = 1
-        while os.path.exists(f"svm_gridsearch_results_{count}.csv"):
-            count += 1
-        savepath = f"svm_gridsearch_results_{count}.csv"
-    results_df.to_csv(savepath, index=False)
-    print(f"Results saved to {savepath}")
