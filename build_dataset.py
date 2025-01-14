@@ -18,8 +18,8 @@ def get_augmentations():
 scenes_dir = "/datasets/eduardo/foresteyes/landsat_8/allbands_8b/"
 gt_dir = "/datasets/eduardo/foresteyes/truth_masks/"
 seg_dir = "/datasets/eduardo/foresteyes/superpixels_pucmg/SegmPCA_original/SLIC/scenes_pca/4000"
-output_dir = "segment_embeddings_classification_dataset_norsz"
-segment_size = (28, 28)
+output_dir = "segment_embeddings_classification_dataset_norsz_64sq"
+segment_size = (64, 64)
 num_augmentations = 5  # Set number of augmented images per segment
 
 # Helper functions
@@ -45,7 +45,10 @@ def prepare_and_save_segments():
 
     os.makedirs(output_dir, exist_ok=True)
 
+    resizes = dict()
+
     for scene, gt, seg, region_id in zip(scenes, gts, segmentations, region_ids):
+        rsz = 0
         unique_superpixels = np.unique(seg)
 
         # Create folders for each region
@@ -83,6 +86,7 @@ def prepare_and_save_segments():
                 resized_image[offset[0]:offset[0] + cropped_image.shape[0], offset[1]:offset[1] + cropped_image.shape[1]] = cropped_image
                 resized_gt[offset[0]:offset[0] + cropped_gt.shape[0], offset[1]:offset[1] + cropped_gt.shape[1]] = cropped_gt
             else:
+                rsz += 1
                 resized_image = transform.resize(cropped_image, segment_size, anti_aliasing=True)
                 resized_gt = transform.resize(cropped_gt, segment_size, anti_aliasing=False, order=0)
 
@@ -106,6 +110,11 @@ def prepare_and_save_segments():
                 augmented_image = get_augmentations()(image=resized_image)["image"]
                 augmented_path = os.path.join(region_folder, "augmented", f"{superpixel_id}_{segment_class}_aug_{i}.png")
                 io.imsave(augmented_path, augmented_image, check_contrast=False)
+
+        resizes[region_id] = rsz
+
+    for region_id, rsz in resizes.items():
+        print(f"{region_id}: {rsz} segments resized")
 
 def load_superpixels(seg_path):
     if seg_path.endswith(".npy"):
