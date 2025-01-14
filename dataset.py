@@ -54,7 +54,7 @@ class SegmentClassificationDataset(Dataset):
                     self.image_paths.append(file_path)
                     
                     label = filename.split('_')[1].split('.')[0]
-                    label = 0 if label == 'forest' else 1 if 'recent-def' in label else -1
+                    label = 0 if label == 'forest' else 1 if 'recent-def' in label else 2
                     self.labels.append(label)
 
     def __len__(self):

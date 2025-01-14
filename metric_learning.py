@@ -71,9 +71,9 @@ if __name__ == "__main__":
             save_every_epoch = True
 
             train_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=train_regions, transform=transform, return_dict=False, exc_labels=[-1])
+                root_dir=root_dir, regions=train_regions, transform=transform, return_dict=False, exc_labels=[2])
             val_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=val_regions, transform=False, return_dict=False, exc_labels=[-1])
+                root_dir=root_dir, regions=val_regions, transform=False, return_dict=False, exc_labels=[2])
             
             print(f"Len Train Dataset: {len(train_dataset)} | Len Val Dataset: {len(val_dataset)}")
             print(50 * '=')
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             print(f"Recent deforestation samples in val dataset: {sum([1 for x in val_dataset if x[1] == 1])}")
 
             # DataLoader with Sampler
-            batch_size = 256
+            batch_size = 32
 
             train_sampler = MPerClassSampler(labels=train_dataset.labels, m=batch_size//2, length_before_new_iter=len(train_dataset))
             val_sampler = MPerClassSampler(labels=val_dataset.labels, m=batch_size//2, length_before_new_iter=len(val_dataset))
