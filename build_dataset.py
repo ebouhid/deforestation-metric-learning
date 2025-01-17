@@ -9,8 +9,6 @@ from tqdm import tqdm
 # Define augmentation transformations
 def get_augmentations():
     return Compose([
-        RandomBrightnessContrast(p=0.5),
-        RGBShift(p=0.5),
         Rotate(limit=45, p=0.5)
     ])
 
