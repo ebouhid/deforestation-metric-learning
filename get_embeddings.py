@@ -139,6 +139,7 @@ if __name__ == "__main__":
     metadata["fine_tune_ckpt"] = args.fine_tune_ckpt
     metadata["train_regions"] = TRAIN_REGIONS
     metadata["val_regions"] = VAL_REGIONS
+    metadata["test_regions"] = TEST_REGIONS
     metadata["output_dims"] = model.get_output_dims()
 
     os.makedirs(os.path.join(args.output_dir), exist_ok=True)
