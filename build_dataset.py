@@ -12,14 +12,6 @@ def get_augmentations():
         Rotate(limit=45, p=0.5)
     ])
 
-# Parameters
-scenes_dir = "/datasets/eduardo/foresteyes/landsat_8/allbands_8b/"
-gt_dir = "/datasets/eduardo/foresteyes/truth_masks/"
-seg_dir = "/datasets/eduardo/foresteyes/superpixels_pucmg/SegmPCA_original/SLIC/scenes_pca/4000"
-output_dir = "segment_embeddings_classification_dataset_norsz_64sq"
-segment_size = (64, 64)
-num_augmentations = 5  # Set number of augmented images per segment
-
 # Helper functions
 def get_hor(segment):
     segment = segment.flatten().astype(np.uint8)
@@ -34,9 +26,12 @@ def get_major_class(segment):
     majority_class = np.argmax(np.bincount(segment))
     return "forest" if majority_class == 2 else "recent-deforestation" if majority_class == 1 else "not-analyzed"
 
-def prepare_and_save_segments():
+def correct_band_indexing(bands):
+    return [ch-1 for ch in bands]
+
+def prepare_and_save_segments(bands):
     # Load files
-    scenes = [np.load(os.path.join(scenes_dir, f))[:, :, [3, 2, 1]] for f in sorted(os.listdir(scenes_dir)) if 'x05' not in f]
+    scenes = [np.load(os.path.join(scenes_dir, f))[:, :, bands] for f in sorted(os.listdir(scenes_dir)) if 'x05' not in f]
     gts = [np.load(os.path.join(gt_dir, f)).squeeze() for f in sorted(os.listdir(gt_dir)) if 'x05' not in f]
     segmentations = [load_superpixels(os.path.join(seg_dir, f)) for f in sorted(os.listdir(seg_dir)) if 'x05' not in f]
     region_ids = [f"x{i + 1 :02d}" for i in range(len(scenes) + 1) if i != 4]
@@ -111,8 +106,9 @@ def prepare_and_save_segments():
 
         resizes[region_id] = rsz
 
-    for region_id, rsz in resizes.items():
-        print(f"{region_id}: {rsz} segments resized")
+    with open(os.path.join(output_dir, "resizes.txt"), "w") as f:
+        for region_id, rsz in resizes.items():
+            f.write(f"{region_id}: {rsz}\n")
 
 def load_superpixels(seg_path):
     if seg_path.endswith(".npy"):
@@ -122,5 +118,14 @@ def load_superpixels(seg_path):
     else:
         raise ValueError("Unsupported file format")
 
-# Run preparation and saving
-prepare_and_save_segments()
+if __name__ == "__main__":
+    # Run preparation and saving
+    # Parameters
+    scenes_dir = "/datasets/eduardo/foresteyes/landsat_8/allbands_8b/"
+    gt_dir = "/datasets/eduardo/foresteyes/truth_masks/"
+    seg_dir = "/datasets/eduardo/foresteyes/superpixels_pucmg/SegmPCA_original/SLIC/scenes_pca/4000"
+    output_dir = "dml_dataset_431_64sq"
+    segment_size = (64, 64)
+    num_augmentations = 5  # Set number of augmented images per segment
+    bands = [4, 3, 1]
+    prepare_and_save_segments(bands)

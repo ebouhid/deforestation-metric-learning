@@ -65,7 +65,7 @@ class SegmentClassificationDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         label = self.labels[idx]
 
-        # Apply ToTensor and Normalize transforms independently
+        # Apply ToTensor transforms independently
         mandatory_transforms = T.Compose([
             T.ToTensor(),
         ])
