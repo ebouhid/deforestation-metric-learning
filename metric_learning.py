@@ -227,7 +227,7 @@ if __name__ == "__main__":
             embedding_size = timm.create_model(backbone_name, pretrained=True).fc.in_features
             trunk = TrunkModel(backbone_name=backbone_name)
             embedder = EmbedderModel(input_size=trunk.backbone.num_features, embedding_size=embedding_size)
-            device = torch.device("cuda:1")
+            device = torch.device("cuda:0")
             model = torch.nn.Sequential(trunk, embedder).to(device)
 
             # Loss and Miner

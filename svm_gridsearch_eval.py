@@ -86,6 +86,7 @@ def append_results_to_csv(results, csv_path, lock):
 
 if __name__ == "__main__":
     embeddings_to_evaluate = ['r18dml654', 'r50dml654', 'har654', 'r101dml654']
+    # embeddings_to_evaluate = ['har654']
     savepath = "svm_gridsearch_results.csv"
 
     # Initialize multiprocessing manager
