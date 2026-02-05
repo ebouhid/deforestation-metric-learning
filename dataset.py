@@ -4,6 +4,22 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torch
 
+# Class mapping for multiclass deforestation detection (from build_dataset.py)
+CLASS_NAMES = {
+    0: "forest",
+    1: "desmatamento_cr",        # Desmatamento corte raso
+    2: "desmatamento_veg",       # Desmatamento com vegetação
+    3: "mineracao",              # Mineração
+    4: "degradacao",             # Degradação
+    5: "cicatriz_de_queimada",   # Cicatriz de incêndio florestal
+    6: "cs_desordenado",         # Corte seletivo Desordenado
+    7: "cs_geometrico",          # Corte seletivo Geométrico
+    8: "nao_definido",           # Non-defined deforestation
+}
+
+# Reverse mapping: class name -> label ID
+CLASS_NAME_TO_ID = {v: k for k, v in CLASS_NAMES.items()}
+
 class SegmentClassificationDataset(Dataset):
     def __init__(self, root_dir, regions, transform=False, return_dict=True, exc_labels=None):
         self.root_dir = root_dir
@@ -53,8 +69,20 @@ class SegmentClassificationDataset(Dataset):
                     file_path = os.path.join(folder, filename)
                     self.image_paths.append(file_path)
                     
-                    label = filename.split('_')[1].split('.')[0]
-                    label = 0 if label == 'forest' else 1 if 'recent-def' in label else 2
+                    # Extract class name from filename (format: {id}_{class_name}.png or {id}_{class_name}_aug_{i}.png)
+                    parts = filename.replace('.png', '').split('_')
+                    # Handle augmented files: {id}_{class_name}_aug_{i}
+                    if 'aug' in parts:
+                        aug_idx = parts.index('aug')
+                        class_name = '_'.join(parts[1:aug_idx])
+                    else:
+                        class_name = '_'.join(parts[1:])
+                    
+                    # Map class name to label ID
+                    label = CLASS_NAME_TO_ID.get(class_name, -1)
+                    if label == -1:
+                        print(f"Warning: Unknown class '{class_name}' in file {filename}")
+                        continue
                     self.labels.append(label)
 
     def __len__(self):
@@ -65,9 +93,10 @@ class SegmentClassificationDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         label = self.labels[idx]
 
-        # Apply ToTensor transforms independently
+        # Apply ToTensor and ImageNet normalization (required for pretrained models)
         mandatory_transforms = T.Compose([
             T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
 
         image = mandatory_transforms(image)

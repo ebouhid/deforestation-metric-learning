@@ -166,46 +166,35 @@ def train(model, loss_func, mining_func, device, train_loader, optimizer, epoch)
 
 
 if __name__ == "__main__":
-    result_dir = "dml_results_gecco1"
+    result_dir = "dml_results_sentinelGECCO-256sq-run0"
     for backbone_name in ["resnet18", "resnet50", "resnet101"]:
         os.makedirs(os.path.join(result_dir, backbone_name), exist_ok=True)
         os.makedirs(os.path.join(result_dir, backbone_name, "models"), exist_ok=True)
         for miner_type in ["all"]:
             # Set up dataset
-            root_dir = "dml_dataset_431_64sq/"
-            train_regions = ["x01", "x02", "x06", "x07", "x08", "x10"]
-            val_regions = ["x09"]
+            root_dir = "dml_dataset_sentinelGECCO-256sq/"
+            train_regions = ["x01", "x02", "x06", "x08", "x10"]
+            val_regions = ["x07", "x09"]
             test_regions = ["x03", "x04"]
             transform = True
             save_every_epoch = True
 
             train_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=train_regions, transform=transform, return_dict=False, exc_labels=[2])
+                root_dir=root_dir, regions=train_regions, transform=transform, return_dict=False, exc_labels=[8])
             val_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=val_regions, transform=False, return_dict=False, exc_labels=[2])
+                root_dir=root_dir, regions=val_regions, transform=False, return_dict=False, exc_labels=[8])
             test_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=test_regions, transform=False, return_dict=False, exc_labels=[2])
-            
-            print(f"Len Train Dataset: {len(train_dataset)} | Len Val Dataset: {len(val_dataset)} | Len Test Dataset: {len(test_dataset)}")
-            print(50 * '=')
-            print(f"Forest samples in train dataset: {sum([1 for x in train_dataset if x[1] == 0])}")
-            print(f"Recent deforestation samples in train dataset: {sum([1 for x in train_dataset if x[1] == 1])}")
-            print(50 * "-")
-            print(f"Forest samples in val dataset: {sum([1 for x in val_dataset if x[1] == 0])}")
-            print(f"Recent deforestation samples in val dataset: {sum([1 for x in val_dataset if x[1] == 1])}")
-            print(50 * "-")
-            print(f"Forest samples in test dataset: {sum([1 for x in test_dataset if x[1] == 0])}")
-            print(f"Recent deforestation samples in test dataset: {sum([1 for x in test_dataset if x[1] == 1])}")
+                root_dir=root_dir, regions=test_regions, transform=False, return_dict=False, exc_labels=[8])
 
-            # DataLoader with Sampler
-            batch_size = 32
-            train_sampler = MPerClassSampler(labels=train_dataset.labels, m=batch_size//2, length_before_new_iter=len(train_dataset))
-            val_sampler = MPerClassSampler(labels=val_dataset.labels, m=batch_size//2, length_before_new_iter=len(val_dataset))
-            test_sampler = MPerClassSampler(labels=test_dataset.labels, m=batch_size//2, length_before_new_iter=len(test_dataset))
+            print(f"Train samples: {len(train_dataset)}, Val samples: {len(val_dataset)}, Test samples: {len(test_dataset)}")
+            # DataLoader with Sampler (only for training)
+            batch_size = 64
+            train_sampler = MPerClassSampler(labels=train_dataset.labels, m=8, length_before_new_iter=len(train_dataset))
             
-            train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=32, sampler=train_sampler)
-            val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=False, sampler=val_sampler)
-            test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=4, shuffle=False, sampler=test_sampler)
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, sampler=train_sampler)
+            # Val/Test loaders without sampler for complete, deterministic evaluation
+            val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=False)
+            test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=4, shuffle=False)
 
             # Set up embedding model
             class TrunkModel(torch.nn.Module):

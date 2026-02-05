@@ -14,26 +14,44 @@ def get_augmentations():
 
 # Helper functions
 def get_hor(segment):
+    """Calculate Homogeneity of Region as the proportion of the majority class."""
     segment = segment.flatten().astype(np.uint8)
-    NFP = np.count_nonzero(segment == 2)
-    NP = np.count_nonzero(segment)
-    NNP = NP - NFP
-    HoR = max([NFP, NNP]) / NP if NP > 0 else 0
+    if len(segment) == 0:
+        return 0
+    bincount = np.bincount(segment)
+    majority_count = np.max(bincount)
+    total_count = len(segment)
+    HoR = majority_count / total_count if total_count > 0 else 0
     return HoR
 
+# Class mapping for multiclass deforestation detection
+CLASS_NAMES = {
+    0: "forest",
+    1: "desmatamento_cr",        # Desmatamento corte raso
+    2: "desmatamento_veg",       # Desmatamento com vegetação
+    3: "mineracao",              # Mineração
+    4: "degradacao",             # Degradação
+    5: "cicatriz_de_queimada",   # Cicatriz de incêndio florestal
+    6: "cs_desordenado",         # Corte seletivo Desordenado
+    7: "cs_geometrico",          # Corte seletivo Geométrico
+    8: "nao_definido",           # Non-defined deforestation
+}
+
 def get_major_class(segment):
+    """Return the class name of the majority class in the segment."""
     segment = segment.flatten().astype(np.uint8)
     majority_class = np.argmax(np.bincount(segment))
-    return "forest" if majority_class == 2 else "recent-deforestation" if majority_class == 1 else "not-analyzed"
+    return CLASS_NAMES.get(majority_class, "unknown")
 
 def correct_band_indexing(bands):
     return [ch-1 for ch in bands]
 
 def prepare_and_save_segments(bands):
     # Load files
-    scenes = [np.load(os.path.join(scenes_dir, f))[:, :, bands] for f in sorted(os.listdir(scenes_dir)) if 'x05' not in f]
+    corrected_bands = correct_band_indexing(bands)
+    scenes = [np.load(os.path.join(scenes_dir, f))[:, :, corrected_bands] for f in sorted(os.listdir(scenes_dir)) if 'x05' not in f]
     gts = [np.load(os.path.join(gt_dir, f)).squeeze() for f in sorted(os.listdir(gt_dir)) if 'x05' not in f]
-    segmentations = [load_superpixels(os.path.join(seg_dir, f)) for f in sorted(os.listdir(seg_dir)) if 'x05' not in f]
+    segmentations = [load_superpixels(os.path.join(seg_dir, f)) for f in sorted(os.listdir(seg_dir)) if 'x05' not in f and os.path.isfile(os.path.join(seg_dir, f))]
     region_ids = [f"x{i + 1 :02d}" for i in range(len(scenes) + 1) if i != 4]
 
     os.makedirs(output_dir, exist_ok=True)
@@ -65,8 +83,8 @@ def prepare_and_save_segments(bands):
             if get_hor(cropped_gt) < 0.7 or cropped_image.size < 70:
                 continue
 
-            # Skip not_analyzed segments
-            if get_major_class(cropped_gt) == "not_analyzed":
+            # Skip unknown class segments
+            if get_major_class(cropped_gt) == "unknown":
                 continue
 
             # Put segment into a [segment_size] shaped zero-padded image
@@ -121,11 +139,14 @@ def load_superpixels(seg_path):
 if __name__ == "__main__":
     # Run preparation and saving
     # Parameters
-    scenes_dir = "/datasets/eduardo/foresteyes/landsat_8/allbands_8b/"
-    gt_dir = "/datasets/eduardo/foresteyes/truth_masks/"
-    seg_dir = "/datasets/eduardo/foresteyes/superpixels_pucmg/SegmPCA_original/SLIC/scenes_pca/4000"
-    output_dir = "dml_dataset_431_64sq"
-    segment_size = (64, 64)
+    scenes_dir = "/home/ebneto/foresteyes/scenes_sentinel2/"
+    gt_dir = "/home/ebneto/foresteyes/truth_masks_sentinel2-DETERMulticlass/deter_multiclass_truth/"
+    seg_dir = "/home/ebneto/bandselection/slics_sentinel_pca/"
+    output_dir = "dml_dataset_sentinelGECCO-256sq"
+    segment_size = (256, 256)
     num_augmentations = 5  # Set number of augmented images per segment
-    bands = [4, 3, 1]
+    # Digit_2: 13 (65.00%)
+    # Digit_8: 7 (35.00%)
+    # Digit_6: 5 (25.00%)
+    bands = [2, 8, 6]
     prepare_and_save_segments(bands)
