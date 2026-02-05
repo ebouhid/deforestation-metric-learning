@@ -9,6 +9,7 @@ __pycache__/
 # Embeddings (dataset)
 embeddings*
 segment_embeddings*
+dml_dataset_*/
 
 # Model fine-tune results
 *_training_results
