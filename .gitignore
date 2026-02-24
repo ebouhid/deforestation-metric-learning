@@ -10,6 +10,7 @@ __pycache__/
 embeddings*
 segment_embeddings*
 dml_dataset_*/
+dml_results_*/
 
 # Model fine-tune results
 *_training_results
