@@ -206,30 +206,50 @@ def train(model, loss_func, mining_func, device, train_loader, optimizer, epoch)
 
 
 if __name__ == "__main__":
-    result_dir = "dml_results_sentinelGECCO-256sq-run0"
-    for backbone_name in ["resnet101"]:#["resnet18", "resnet50", "resnet101"]:
+    result_dir = "dml_results_sentinelGECCO-256sq-balanced-regularized"
+    for backbone_name in ["resnet18"]:#["resnet18", "resnet50", "resnet101"]:
         os.makedirs(os.path.join(result_dir, backbone_name), exist_ok=True)
         os.makedirs(os.path.join(result_dir, backbone_name, "models"), exist_ok=True)
-        for miner_type in ["all"]:
+        for miner_type in ["semihard"]:
             # Set up dataset
-            root_dir = "dml_dataset_sentinelGECCO-256sq/"
-            train_regions = ["x02", "x06", "x08", "x10"]
+            root_dir = "dml_dataset_sentinelGECCO-256sq-balanced20/"
+            train_regions = ["x06", "x08", "x10"]
             val_regions = ["x01", "x07", "x09"]
-            test_regions = ["x03", "x04"]
+            test_regions = ["x02", "x03", "x04"]
             transform = True
             save_every_epoch = True
 
             train_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=train_regions, transform=transform, return_dict=False, exc_labels=[8])
+                root_dir=root_dir, regions=train_regions, transform=transform, return_dict=False, exc_labels=[3, 5, 6, 7, 8])
             val_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=val_regions, transform=False, return_dict=False, exc_labels=[8])
+                root_dir=root_dir, regions=val_regions, transform=False, return_dict=False, exc_labels=[3, 5, 6, 7, 8])
             test_dataset = SegmentClassificationDataset(
-                root_dir=root_dir, regions=test_regions, transform=False, return_dict=False, exc_labels=[8])
+                root_dir=root_dir, regions=test_regions, transform=False, return_dict=False, exc_labels=[3, 5, 6, 7, 8])
 
             print(f"Train samples: {len(train_dataset)}, Val samples: {len(val_dataset)}, Test samples: {len(test_dataset)}")
+            
+            # Relationship: batch_size = m × num_classes
+            num_classes = len(set(train_dataset.labels))
+            min_class_count = min(Counter(train_dataset.labels).values())
+            
+            target_batch_size = 64
+            
+            m = min(
+                target_batch_size // num_classes,  # Fit within target batch size
+                min_class_count,                    # Don't exceed smallest class count
+            )
+            m = max(m, 2)  # At least 2 per class for pairs/triplets
+            
+            batch_size = m * num_classes
+            
+            print(f"\nSampler configuration:")
+            print(f"  num_classes: {num_classes}")
+            print(f"  min_class_count: {min_class_count}")
+            print(f"  m (samples per class per batch): {m}")
+            print(f"  batch_size (m × num_classes): {batch_size}")
+            
             # DataLoader with Sampler (only for training)
-            batch_size = 64
-            train_sampler = MPerClassSampler(labels=train_dataset.labels, m=8, length_before_new_iter=len(train_dataset))
+            train_sampler = MPerClassSampler(labels=train_dataset.labels, m=m, length_before_new_iter=len(train_dataset))
             
             train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, sampler=train_sampler)
             # Val/Test loaders without sampler for complete, deterministic evaluation
